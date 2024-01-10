@@ -101,7 +101,7 @@ class AsyncAPISocketIO(AsyncServer):
 
         return await super().emit(event, *args, **kwargs)
 
-    def doc_emit(self, event: str, model: Type[BaseModel], discription: str = ""):
+    def doc_emit(self, event: str, model: Type[BaseModel], namespace=None, discription: str = ""):
         """
         Decorator to register/document a SocketIO emit event. This will be
         used to generate AsyncAPI specs and validate emits calls.
@@ -116,7 +116,7 @@ class AsyncAPISocketIO(AsyncServer):
                     raise ValueError(f"Event {event} already registered with different model {model.__name__}")
             else:
                 self.emit_models[event] = model
-            self.asyncapi_doc.add_new_sender(event, model, discription)
+                self.asyncapi_doc.add_new_sender(namespace, event, model, discription)
             return func
         return decorator
 
@@ -165,6 +165,7 @@ class AsyncAPISocketIO(AsyncServer):
             if self.generate_docs:
                 self.asyncapi_doc.add_new_receiver(
                     handler,
+                    namespace,
                     message,
                     ack_data_model=response_model,
                     payload_model=request_model,
@@ -178,7 +179,7 @@ class AsyncAPISocketIO(AsyncServer):
                 return await new_handler(*args, **kwargs)
 
             # Decorate with SocketIO.on decorator
-            super(AsyncAPISocketIO, self).on(message, namespace)(wrapper)
+            super(AsyncAPISocketIO, self).on(message, namespace=namespace)(wrapper)
             return wrapper
         return decorator
 

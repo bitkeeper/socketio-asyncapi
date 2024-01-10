@@ -9,7 +9,7 @@ import yaml
 from loguru import logger
 from pydantic import BaseModel, schema
 
-from socketio_asyncapi.asyncapi.models.async_api_base import AsyncAPIBase
+from socketio_asyncapi.asyncapi.models.async_api_base import AsyncAPIBase, ChannelItem
 from socketio_asyncapi.asyncapi.models.message import Message
 
 from .utils import add_ref_prepath
@@ -99,6 +99,7 @@ class AsyncAPIDoc(AsyncAPIBase):
     def add_new_receiver(
             self,
             handler: Callable,
+            namespace: Optional[str],
             name: str,
             message_name=None,
             ack_data_model: Optional[Union[Type[BaseModel], NotProvidedType]] = None,
@@ -168,11 +169,13 @@ class AsyncAPIDoc(AsyncAPIBase):
 
         # add to sub
         one_of = {"$ref": f"#/components/messages/{message_name}"}
-        if self.channels and self.channels["/"] and self.channels["/"].publish and self.channels["/"].publish.message:
-            self.channels["/"].publish.message.__dict__["oneOf"].append(one_of)
+        channel = self._get_channel(namespace)
+        if channel:
+              channel.publish.message.__dict__["oneOf"].append(one_of)
 
     def add_new_sender(
             self,
+            namespace: None,
             event: str,
             payload_model: Optional[Union[Type[BaseModel], NotProvidedType]] = None,
             description: Optional[str] = None,
@@ -216,5 +219,26 @@ class AsyncAPIDoc(AsyncAPIBase):
 
         # add to pub
         one_of = {"$ref": f"#/components/messages/{event}"}
-        if self.channels and self.channels["/"] and self.channels["/"].subscribe and self.channels["/"].subscribe.message:
-            self.channels["/"].subscribe.message.__dict__["oneOf"].append(one_of)
+        channel = self._get_channel(namespace)
+        if channel:
+              channel.subscribe.message.__dict__["oneOf"].append(one_of)
+
+    def _get_channel(self, namespace: Optional[str]) ->ChannelItem:
+        '''Get specific channel, if not already present create it'''
+        channel_id: str = namespace if namespace else '/'
+        if channel_id not in self.channels:
+            self.channels[channel_id] = ChannelItem.parse_obj(
+                                        {
+                                        "publish": {
+                                            "message": {
+                                            "oneOf": []
+                                            }
+                                        },
+                                        "subscribe": {
+                                            "message": {
+                                            "oneOf": []
+                                            }
+                                        }
+                                        }
+                                    )
+        return self.channels[channel_id]
