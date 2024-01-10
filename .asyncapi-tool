@@ -1,9 +1,9 @@
-title: SIO-AsyncAPI
+title: SocketIO-AsyncAPI
 description: This is code-first approach to generate AsyncAPI specification from Socket.IO server.
 links:
-  websiteUrl: https://github.com/daler-rahimov/sio-asyncapi
-  docsUrl: https://github.com/daler-rahimov/sio-asyncapi
-  repoUrl: https://github.com/daler-rahimov/sio-asyncapi
+  websiteUrl: https://github.com/bitkeeper/socketio-asyncapi
+  docsUrl: https://github.com/bitkeeper/socketio-asyncapi
+  repoUrl: https://github.com/bitkeeper/socketio-asyncapi
 filters:
   language: Python
   technology:
