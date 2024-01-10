@@ -1,12 +1,11 @@
 import inspect
 from typing import Callable, Optional, Type, Union
 
-from flask import Flask
-from flask_socketio import SocketIO
+from socketio import AsyncServer
 from loguru import logger
 from pydantic import BaseModel, ValidationError
 
-from sio_asyncapi.asyncapi.docs import AsyncAPIDoc, NotProvidedType
+from socketio_asyncapi.asyncapi.docs import AsyncAPIDoc, NotProvidedType
 
 class BaseValildationError(ValidationError):
     @classmethod
@@ -27,8 +26,8 @@ class EmitValidationError(BaseValildationError):
     pass
 
 
-class AsyncAPISocketIO(SocketIO):
-    """Inherits the :class:`flask_socketio.SocketIO` class.
+class AsyncAPISocketIO(AsyncServer):
+    """Inherits the :class:`scoketio.AsyncServer` class.
     Adds ability to validate with pydantic models and generate AsycnAPI spe.
 
     Example::
@@ -47,7 +46,6 @@ class AsyncAPISocketIO(SocketIO):
 
     def __init__(
         self,
-        app: Optional[Flask] = None,
         *args,
         validate: bool = False,
         generate_docs: bool = True,
@@ -80,10 +78,10 @@ class AsyncAPISocketIO(SocketIO):
                 server_url=server_url,
                 server_name=server_name,
             )
-        super().__init__(app=app, *args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.emit_models: dict[str, Type[BaseModel]] = {}
 
-    def emit(self, event: str, *args, **kwargs):
+    async def emit(self, event: str, *args, **kwargs):
         """
         Overrides emit in order to validate data with pydantic models
 
@@ -97,7 +95,7 @@ class AsyncAPISocketIO(SocketIO):
                 except ValidationError as e:
                     logger.error(f"Error validating emit '{event}': {e}")
                     raise EmitValidationError.init_from_super(e)
-        return super().emit(event, *args, **kwargs)
+        return await super().emit(event, *args, **kwargs)
 
     def doc_emit(self, event: str, model: Type[BaseModel], discription: str = ""):
         """
@@ -166,12 +164,12 @@ class AsyncAPISocketIO(SocketIO):
                     payload_model=request_model,
                 )
 
-            def wrapper(*args, **kwargs):
+            async def wrapper(*args, **kwargs):
                 new_handler = self._handle_all(
                     request_model=request_model,
                     response_model=response_model
                 )(handler)
-                return new_handler(*args, **kwargs)
+                return await new_handler(*args, **kwargs)
 
             # Decorate with SocketIO.on decorator
             super(AsyncAPISocketIO, self).on(message, namespace)(wrapper)
@@ -195,7 +193,7 @@ class AsyncAPISocketIO(SocketIO):
 
         def decorator(handler: Callable):
 
-            def wrapper(*args, **kwargs):
+            async def wrapper(*args, **kwargs):
                 did_request_came_as_arg = False
                 request = None
                 # check if request is in args or kwargs
@@ -225,7 +223,7 @@ class AsyncAPISocketIO(SocketIO):
                             kwargs["request"] = request
 
                 # call handler with converted request and validate response
-                response = handler(*args, **kwargs)
+                response = await handler(*args, **kwargs)
                 if response:
                     try:
                         if self.validate and response_model and \
