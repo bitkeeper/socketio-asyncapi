@@ -108,8 +108,10 @@ class AsyncAPISocketIO(AsyncServer):
         """
         def decorator(func):
             if self.emit_models.get(event):
-                raise ValueError(f"Event {event} already registered")
-            self.emit_models[event] = model
+                if self.emit_models.get(event)!=model:
+                    raise ValueError(f"Event {event} already registered with different model {model.__name__}")
+            else:
+            	self.emit_models[event] = model
             self.asyncapi_doc.add_new_sender(event, model, discription)
             return func
         return decorator
