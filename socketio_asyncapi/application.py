@@ -148,7 +148,7 @@ class AsyncAPISocketIO(AsyncServer):
             nonlocal response_model
             if get_from_typehint:
                 try:
-                    first_arg_name = inspect.getfullargspec(handler)[0][0]
+                    first_arg_name = inspect.getfullargspec(handler)[0][-1]
                 except IndexError:
                     posible_request_model = None
                 else:
