@@ -60,6 +60,7 @@ class AsyncAPIDoc(AsyncAPIBase):
         server_url: str = "http://localhost:5000",
         server_name: str = "BACKEND",
         server_protocol: str = "socketio",
+        server_protocolVersion: str = "5"
     ) -> "AsyncAPIDoc":
         """Initialize AsyncAPI documentation generator."""
         logger.info(f"{server_url=}, {server_name=}, {server_protocol=}")
@@ -75,7 +76,9 @@ class AsyncAPIDoc(AsyncAPIBase):
             "servers": {
                 server_name: {
                     "url": server_url,
-                    "protocol": server_protocol}},
+                    "protocol": server_protocol,
+                    "protocolVersion": server_protocolVersion
+                    }},
             "asyncapi": "2.5.0",
             "channels": default_channels,
             "components": default_components,
