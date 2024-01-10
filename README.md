@@ -10,12 +10,12 @@ SocketIO-AsyncAPI
 
 [pypi-image]: https://img.shields.io/pypi/v/sio_asyncapi
 [pypi-url]: https://pypi.org/project/sio_asyncapi/
-[build-image]: https://github.com/daler-rahimov/sio-asyncapi/actions/workflows/python-package.yml/badge.svg
-[build-url]: https://github.com/daler-rahimov/sio-asyncapi/actions/workflows/python-package.yml
-[coverage-image]: https://codecov.io/gh/daler-rahimov/sio-asyncapi/branch/develop/graph/badge.svg
-[coverage-url]: https://app.codecov.io/gh/daler-rahimov/sio-asyncapi
-[versions-image]: https://img.shields.io/pypi/pyversions/sio_asyncapi/
-[versions-url]: https://pypi.org/project/sio_asyncapi/
+[build-image]: https://github.com/bitkeeper/socketio-asyncapi/actions/workflows/python-package.yml/badge.svg
+[build-url]: https://github.com/bitkeeper/socketio-asyncapi/actions/workflows/python-package.yml
+[coverage-image]: https://codecov.io/gh/bitkeeper/socketio-asyncapi/branch/develop/graph/badge.svg
+[coverage-url]: https://app.codecov.io/gh/bitkeeper/socketio-asyncapi
+[versions-image]: https://img.shields.io/pypi/pyversions/socketio_asyncapi/
+[versions-url]: https://pypi.org/project/socketio_asyncapi/
 
 SocketIO-AsyncAPI is a fork of [SIO-AsyncAPI](https://github.com/daler-rahimov/sio-asyncapi) from [Daler Rahimov](https://github.com/)daler-rahimov.
 Main difference with SIO-AsyncAPI is that SocketIO-AsyncAPI isn't based on [Flask-SocketIO](https://flask-socketio.readthedocs.io/) but directly on [python-socketio](https://python-socketio.readthedocs.io/en/stable/) and uses python `async` interface.
