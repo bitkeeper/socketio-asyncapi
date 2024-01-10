@@ -9,8 +9,8 @@ import yaml
 from loguru import logger
 from pydantic import BaseModel
 
-from sio_asyncapi.asyncapi.models.async_api_base import AsyncAPIBase
-from sio_asyncapi.asyncapi.models.message import Message
+from socketio_asyncapi.asyncapi.models.async_api_base import AsyncAPIBase
+from socketio_asyncapi.asyncapi.models.message import Message
 
 from .utils import add_ref_prepath
 
