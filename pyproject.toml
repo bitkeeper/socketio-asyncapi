@@ -1,15 +1,15 @@
 [tool.poetry]
-name = "sio_asyncapi"
+name = "socketio_asyncapi"
 version = "0.3.0"
 description = "Flask SocketIO with auto-generate Asyncapi documentation"
-authors = ["Daler Rahimov <daler.edu@gmail.com>"]
+authors = ["Marcel van de Weert<mvdweert@bitlab.nl>"]
 license = "MIT"
 readme = "README.md"
-# packages = [{include = "src/sio_asyncapi"}]
+# packages = [{include = "src/socketio_asyncapi"}]
 
 [tool.poetry.dependencies]
 python = "^3.8.10"
-flask-socketio = "^5.3.2"
+python-socketio = "^5.3.2"
 pydantic = {extras = ["email"], version = "^1.10.4"}
 pyyaml = "^6.0"
 python-engineio = "^4.3.4"
