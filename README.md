@@ -1,4 +1,4 @@
-SIO-AsyncAPI
+SocketIO-AsyncAPI
 ============
 
 [![PyPI Version][pypi-image]][pypi-url]
@@ -17,16 +17,20 @@ SIO-AsyncAPI
 [versions-image]: https://img.shields.io/pypi/pyversions/sio_asyncapi/
 [versions-url]: https://pypi.org/project/sio_asyncapi/
 
+SocketIO-AsyncAPI is a fork of [SIO-AsyncAPI](https://github.com/daler-rahimov/sio-asyncapi) from [Daler Rahimov](https://github.com/)daler-rahimov.
+Main difference with SIO-AsyncAPI is that SocketIO-AsyncAPI isn't based on [Flask-SocketIO](https://flask-socketio.readthedocs.io/) but directly on [python-socketio](https://python-socketio.readthedocs.io/en/stable/) and uses python `async` interface.
 
-SIO-AsyncAPI is a Python library built on the top of [Flask-SocketIO](https://flask-socketio.readthedocs.io/) and driven by [AsyncAPI](https://www.asyncapi.com/). It allows you to generate an AsyncAPI specification from your SocketIO server and validate messages against it.
+SocketIO-AsyncAPI is a Python library built on the top of [python-socketio](https://python-socketio.readthedocs.io/en/stable/). It allows you to generate an [AsyncAPI](https://www.asyncapi.com/) specification from your SocketIO server and validate messages against it.
 
-Similar to FastAPI, SIO-AsyncAPI allows you to define your SocketIO server using Python type annotations and Pydantic models. It also provides a way to generate an AsyncAPI specification from your SocketIO server.
+Similar to FastAPI, SocketIO-AsyncAPI allows you to define your SocketIO server using Python type annotations and Pydantic models. It also provides a way to generate an AsyncAPI specification from your SocketIO server.
 
 
 ## Installation
 
+NOT YET PUBLISHED!!!
+
 ```bash
-pip install sio_asyncapi
+pip install socketio_asyncapi
 ```
 
 ## Basic Example
@@ -218,25 +222,41 @@ servers:
 Rendered version of the above AsyncAPI specification:
 ![](https://github.com/daler-rahimov/sio-asyncapi/blob/master/doc/assets/20221219000543.png?raw=true)
 
-## Converting from Flask-SocketIO to SIO-AsyncAPI
-SIO-AsyncAPI is built on top of Flask-SocketIO and all unit tests of Flask-SocketIO are tested against SIO-AsyncAPI. If you converting your SocketIO server from Flask-SocketIO to SIO-AsyncAPI, you can be sure that your SocketIO server will work as expected. When converting your SocketIO server from Flask-SocketIO to SIO-AsyncAPI, it's as simple as changing the import statement:
+## Converting from SocketIO to SocketIO-AsyncAPI
+SocketIO-AsyncAPI is built on top of SocketIO.  When converting your SocketIO server from SocketIO to SocketIO-AsyncAPI, it's as simple as changing the import statement:
 
 ```python
 # instead of `from flask_socketio import SocketIO`
-from sio_asyncapi import AsyncAPISocketIO as SocketIO
+from socketio_asyncapi import AsyncAPISocketIO as AsyncServer
 ...
 # There are additional arguments that you can pass to the constructor of AsyncAPISocketIO
-socketio = SocketIO(app)
+socketio = AsyncServer(app)
 ...
 ```
 
 ## Acknowledgements
-Most of the implementation follows research done by Dimitrios Dedoussis (https://www.asyncapi.com/blog/socketio-part2) and uses some Pydantic models from [here](https://github.com/albertnadal/asyncapi-schema-pydantic)
+Most of the implementation follows research and implementation done by:
+* Dimitrios Dedoussis (https://www.asyncapi.com/blog/socketio-part2)
+* Daler Rahimov (https://www.asyncapi.com/blog/socketio-automatic-docs)
+* Uses some Pydantic models from [here](https://github.com/albertnadal/asyncapi-schema-pydantic)
+
+## Features
+
+* AsyncAPI specification 2.5
+* Provides `socketio_asyncapi.AsyncAPISocketIO` as a replacement for `socketio.AsyncServer`
+* Uses `async`` communication
+* Function based event handlers
+* Event payload with either a build-in type or pydantic BaseModel
+* Acknowledge (return value of event handler) of an event with a build-in type or pydantic BaseModel
+* Namespaces
+
 
 ## Missing Features
-SIO-AsyncAPI is still in its early stages and there are some features that are not yet implemented. If you are interested in contributing to SIO-AsyncAPI any contribution is welcome. Here is the list of missing features:
+SocketIO-AsyncAPI is still in its early stages and there are some features that are not yet implemented. If you are interested in contributing to SocketIO-AsyncAPI any contribution is welcome. Here is the list of missing features:
 
 - [x] Support of AsycnAPI documentation and validation for `emit` messages
 - [ ] Support of Flask-SocketIO `namespaces` and `rooms`
 - [ ] Authentication and security auto documentation
 - [ ] `connect` and `disconnect` handlers auto documentation
+- [ ] Class based, namespace, event handlers
+- [ ] AsyncAPI specification 3.0
