@@ -121,7 +121,7 @@ class AsyncAPISocketIO(AsyncServer):
             message,
             namespace=None,
             *,
-            get_from_typehint: bool = False,
+            get_from_typehint: bool = True,
             response_model: Optional[Union [Type[BaseModel], NotProvidedType]] = None,
             request_model: Optional[Union [Type[BaseModel], NotProvidedType]] = None,
     ):
