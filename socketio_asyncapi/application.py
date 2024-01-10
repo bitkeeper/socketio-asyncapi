@@ -27,7 +27,7 @@ class EmitValidationError(BaseValildationError):
 
 
 class AsyncAPISocketIO(AsyncServer):
-    """Inherits the :class:`scoketio.AsyncServer` class.
+    """Inherits the :class:`socketio.AsyncServer` class.
     Adds ability to validate with pydantic models and generate AsycnAPI spe.
 
     Example::
