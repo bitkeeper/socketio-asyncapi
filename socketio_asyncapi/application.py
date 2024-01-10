@@ -90,11 +90,15 @@ class AsyncAPISocketIO(AsyncServer):
         if self.validate:
             model = self.emit_models.get(event)
             if model is not None:
-                try:
-                    model.validate(args[0])
-                except ValidationError as e:
-                    logger.error(f"Error validating emit '{event}': {e}")
-                    raise EmitValidationError.init_from_super(e)
+                if issubclass(model, BaseModel):
+                    try:
+                        model.validate(args[0])
+                    except ValidationError as e:
+                        logger.error(f"Error validating emit '{event}': {e}")
+                        raise EmitValidationError.init_from_super(e)
+                elif not(isinstance(args[0], model)):
+                    logger.error(f"Error validating emit '{event}': data doesn't match the required datatype")
+
         return await super().emit(event, *args, **kwargs)
 
     def doc_emit(self, event: str, model: Type[BaseModel], discription: str = ""):
@@ -111,7 +115,7 @@ class AsyncAPISocketIO(AsyncServer):
                 if self.emit_models.get(event)!=model:
                     raise ValueError(f"Event {event} already registered with different model {model.__name__}")
             else:
-            	self.emit_models[event] = model
+                self.emit_models[event] = model
             self.asyncapi_doc.add_new_sender(event, model, discription)
             return func
         return decorator
