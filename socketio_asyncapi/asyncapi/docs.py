@@ -7,7 +7,7 @@ from typing import Callable, Literal, Optional, Type, Union
 
 import yaml
 from loguru import logger
-from pydantic import BaseModel
+from pydantic import BaseModel, schema
 
 from socketio_asyncapi.asyncapi.models.async_api_base import AsyncAPIBase
 from socketio_asyncapi.asyncapi.models.message import Message
@@ -112,9 +112,18 @@ class AsyncAPIDoc(AsyncAPIBase):
             ack = {"$ref": "#/components/schemas/NoSpec"}
         elif isinstance(ack_data_model, type(BaseModel)):
             ack_schema_name = ack_data_model.__name__ # type: ignore
-            ack = ack_data_model.schema() # type: ignore
-            add_ref_prepath(ack, f"/components/schemas/{ack_schema_name}")
-            self.components.schemas[ack_schema_name] = ack # type: ignore
+            ack = {"$ref": f"#/components/schemas/{ack_schema_name}"}
+            ack_schema = ack_data_model.schema() # type: ignore
+            add_ref_prepath(ack_schema, f"/components/schemas/{ack_schema_name}")
+            self.components.schemas[ack_schema_name] = ack_schema # type: ignore
+
+        elif ack_data_model:
+            ack_schema = {}
+            schema.add_field_type_to_schema(ack_data_model, ack_schema)
+            if len(ack_schema)>=1:
+                ack= ack_schema
+            else:
+                ack = None
         else:
             ack = None
 
@@ -126,6 +135,13 @@ class AsyncAPIDoc(AsyncAPIBase):
             payload_schema = payload_model.schema() # type: ignore
             add_ref_prepath(payload_schema, f"/components/schemas/{payload_schema_name}")
             self.components.schemas[payload_schema_name] = payload_schema # type: ignore
+        elif payload_model:
+            payload_schema = {}
+            schema.add_field_type_to_schema(payload_model, payload_schema)
+            if len(payload_schema)>=1:
+                payload= payload_schema
+            else:
+                payload = None
         else:
             payload = None
 
@@ -170,6 +186,13 @@ class AsyncAPIDoc(AsyncAPIBase):
             payload = {"$ref": f"#/components/schemas/{payload_schema_name}"}
             add_ref_prepath(payload_schema, f"/components/schemas/{payload_schema_name}") # type: ignore
             self.components.schemas[payload_schema_name] = payload_schema # type: ignore
+        elif payload_model:
+            payload_schema = {}
+            schema.add_field_type_to_schema(payload_model, payload_schema)
+            if len(payload_schema)>=1:
+                payload= payload_schema
+            else:
+                payload = None
         else:
             payload = None
 
