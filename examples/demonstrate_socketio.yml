@@ -1,0 +1,175 @@
+asyncapi: 2.5.0
+channels:
+  /:
+    publish:
+      message:
+        oneOf:
+        - $ref: '#/components/messages/Get_Asyncapi_Yaml'
+        - $ref: '#/components/messages/My_Event_No_Typing'
+        - $ref: '#/components/messages/My_Event_Dict'
+        - $ref: '#/components/messages/My_Event_And_Emit_Dict'
+        - $ref: '#/components/messages/My_Event_And_Emit_Str'
+        - $ref: '#/components/messages/My_Event_And_Emit_Str_With_Ack'
+        - $ref: '#/components/messages/My_Event_Basemodel'
+        - $ref: '#/components/messages/My_Event_Basemodel_With_Ack'
+        - $ref: '#/components/messages/Connect'
+        - $ref: '#/components/messages/Disconnect'
+    subscribe:
+      message:
+        oneOf:
+        - $ref: '#/components/messages/my_response_dict'
+        - $ref: '#/components/messages/my_response_str'
+        - $ref: '#/components/messages/my_response_basemodel'
+    x-handlers:
+      disconnect: disconnect
+  /ns1:
+    publish:
+      message:
+        oneOf:
+        - $ref: '#/components/messages/My_Event_Ns'
+    subscribe:
+      message:
+        oneOf: []
+components:
+  messages:
+    Connect:
+      description: ''
+      name: connect
+      payload:
+        $ref: '#/components/schemas/NoSpec'
+        deprecated: false
+      x-ack:
+        $ref: '#/components/schemas/NoSpec'
+    Disconnect:
+      description: ''
+      name: disconnect
+      payload:
+        $ref: '#/components/schemas/NoSpec'
+        deprecated: false
+      x-ack:
+        $ref: '#/components/schemas/NoSpec'
+    Get_Asyncapi_Yaml:
+      description: generate and returns a asyncapi yaml schema
+      name: get_asyncapi_yaml
+      payload:
+        $ref: '#/components/schemas/NoSpec'
+        deprecated: false
+      x-ack:
+        type: string
+    My_Event_And_Emit_Dict:
+      description: 'demonstrates and receive event and emit payload as dict '
+      name: my_event_and_emit_dict
+      payload:
+        deprecated: false
+        type: object
+      x-ack:
+        $ref: '#/components/schemas/NoSpec'
+    My_Event_And_Emit_Str:
+      description: 'demonstrates and receive event and emit payload as str '
+      name: my_event_and_emit_str
+      payload:
+        deprecated: false
+        type: string
+      x-ack:
+        $ref: '#/components/schemas/NoSpec'
+    My_Event_And_Emit_Str_With_Ack:
+      description: 'demonstrates and receive event and emit payload as str '
+      name: my_event_and_emit_str_with_ack
+      payload:
+        deprecated: false
+        type: string
+      x-ack:
+        type: string
+    My_Event_Basemodel:
+      description: demonstrates use of a pydantic basemodel for event receive and
+        emit
+      name: my_event_basemodel
+      payload:
+        $ref: '#/components/schemas/MyDataModel'
+        deprecated: false
+      x-ack:
+        $ref: '#/components/schemas/NoSpec'
+    My_Event_Basemodel_With_Ack:
+      description: demonstrates use of a pydantic basemodel for event receive, emit
+        and acknowledge
+      name: my_event_basemodel_with_ack
+      payload:
+        $ref: '#/components/schemas/MyDataModel'
+        deprecated: false
+      x-ack:
+        $ref: '#/components/schemas/MyDataModel'
+    My_Event_Dict:
+      description: demonstrates and receive event, payload as dict and emit without
+        type information (dict used)
+      name: my_event_dict
+      payload:
+        deprecated: false
+        type: object
+      x-ack:
+        $ref: '#/components/schemas/NoSpec'
+    My_Event_No_Typing:
+      description: demonstrates and receive event and emit without type information
+        (dict used)
+      name: my_event_no_typing
+    My_Event_Ns:
+      description: demonstrates use of a pydantic basemodel for event receive and
+        emit
+      name: my_event_ns
+      payload:
+        $ref: '#/components/schemas/MyDataModel'
+        deprecated: false
+      x-ack:
+        $ref: '#/components/schemas/NoSpec'
+    my_response_basemodel:
+      description: ''
+      name: my_response_basemodel
+      payload:
+        $ref: '#/components/schemas/MyDataModel'
+        deprecated: false
+    my_response_dict:
+      description: ''
+      name: my_response_dict
+      payload:
+        deprecated: false
+        type: object
+    my_response_str:
+      description: ''
+      name: my_response_str
+      payload:
+        deprecated: false
+        type: string
+  schemas:
+    MyDataModel:
+      description: Example datamodel
+      properties:
+        message:
+          description: Your message
+          example: foobar
+          title: Message
+          type: string
+      required:
+      - message
+      title: MyDataModel
+      type: object
+    NoSpec:
+      deprecated: false
+      description: Specification is not provided
+info:
+  description: 'Demo Server
+
+    <br/> AsyncAPI currently does not support Socket.IO binding and Web Socket like
+    syntax used for now.
+
+    In order to add support for Socket.IO ACK value, AsyncAPI is extended with with
+    x-ack keyword.
+
+    This documentation should **NOT** be used for generating code due to these limitations.
+
+    '
+  title: Demo
+  version: 1.0.0
+servers:
+  DEMO_SIO:
+    protocol: socketio
+    protocolVersion: '5'
+    url: http://localhost:5010
