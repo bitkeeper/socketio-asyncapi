@@ -149,9 +149,11 @@ class AsyncAPIDoc(AsyncAPIBase):
         # create new message
         new_message = {
             "name": name,
+            "title": message_name,
             "description": handler.__doc__ if  handler.__doc__ else "",
             "x-ack": None,
         }
+        message_name = name
 
         # remove multiple spaces so yaml dump does not try to escape them
         if new_message["description"]:
