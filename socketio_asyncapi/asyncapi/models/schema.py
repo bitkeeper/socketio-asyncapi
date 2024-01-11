@@ -33,12 +33,12 @@ class Schema(BaseModel):
     """
     Additional external documentation for this schema.
     """
-
-    deprecated: Optional[bool] = False
-    """
-    Specifies that a schema is deprecated and SHOULD be transitioned out of usage.
-    Default value is false.
-    """
+    #TODO: only serialize the deprecated field when it is True
+    # deprecated: Optional[bool] = False
+    # """
+    # Specifies that a schema is deprecated and SHOULD be transitioned out of usage.
+    # Default value is false.
+    # """
 
 
     class Config:
