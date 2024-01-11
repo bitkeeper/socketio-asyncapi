@@ -236,19 +236,21 @@ socketio = AsyncServer(app)
 
 ## Acknowledgements
 Most of the implementation follows research and implementation done by:
+* The [AsyncAPI](https://www.asyncapi.com/) initiative and [AsyncAPI git repos](https://github.com/asyncapi)
 * Dimitrios Dedoussis (https://www.asyncapi.com/blog/socketio-part2)
 * Daler Rahimov (https://www.asyncapi.com/blog/socketio-automatic-docs)
-* Uses some Pydantic models from [here](https://github.com/albertnadal/asyncapi-schema-pydantic)
+* Uses some Pydantic models from [asyncapi-schema-pydantic](https://github.com/albertnadal/asyncapi-schema-pydantic)
 
 ## Features
 
 * AsyncAPI specification 2.5
 * Provides `socketio_asyncapi.AsyncAPISocketIO` as a replacement for `socketio.AsyncServer`
-* Uses `async`` communication
+* Uses `async` communication
 * Function based event handlers
 * Event payload with either a build-in type or pydantic BaseModel
 * Acknowledge (return value of event handler) of an event with a build-in type or pydantic BaseModel
 * Namespaces
+* Provides example how to add a rendered version of the API with the standalone version of [asyncapi-react](https://github.com/asyncapi/asyncapi-react).
 
 
 ## Missing Features
