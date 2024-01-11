@@ -257,7 +257,6 @@ Most of the implementation follows research and implementation done by:
 SocketIO-AsyncAPI is still in its early stages and there are some features that are not yet implemented. If you are interested in contributing to SocketIO-AsyncAPI any contribution is welcome. Here is the list of missing features:
 
 - [x] Support of AsycnAPI documentation and validation for `emit` messages
-- [ ] Support of Flask-SocketIO `namespaces` and `rooms`
 - [ ] Authentication and security auto documentation
 - [ ] `connect` and `disconnect` handlers auto documentation
 - [ ] Class based, namespace, event handlers
