@@ -1,9 +1,28 @@
 #!/usr/bin/env python
 
+'''
+Demonstrates the use of socketio_asyncapi:
+- starts a socketio server
+- show several constructions how to expose subscribers and publishers
+- generate a asyncapi yml spec
+- provides an html renderer of the spec at http://localhost:5010/docs?spec=/asyncapi.yml
+
+
+
+http://localhost:5010/docs?spec=/asyncapi.yml
+'''
+
+import pathlib
 import uvicorn
 import socketio
 from socketio_asyncapi import AsyncAPISocketIO
 from pydantic import BaseModel, Field
+
+# On startup the app will generate a static file with the asyncapi on the following location
+asyncapi_specfile_path = pathlib.Path(pathlib.Path(__file__).parent / "demonstrate_socketio.autogen.yml")
+
+# Where to asyncapi renderer (makes use of AsyncAPI react standalone component)
+asyncapi_renderer =pathlib.Path(pathlib.Path(__file__).parent / "asyncapi_renderer" / "index.html")
 
 sio = AsyncAPISocketIO(
     validate=True,
@@ -21,8 +40,10 @@ sio = AsyncAPISocketIO(
     )
 
 app = socketio.ASGIApp(sio, static_files={
-    '/': 'app.html',
+    '/docs': str(asyncapi_renderer),
+    '/asyncapi.yml': str(asyncapi_specfile_path)
 })
+
 background_task_started = False
 
 class MyDataModel(BaseModel):
@@ -123,4 +144,8 @@ async def test_disconnect(sid):
 
 
 if __name__ == '__main__':
+    doc_str = sio.asyncapi_doc.get_yaml()
+    with open(asyncapi_specfile_path, "w") as f:
+        f.write(doc_str)
+
     uvicorn.run(app, host='127.0.0.1', port=5010)

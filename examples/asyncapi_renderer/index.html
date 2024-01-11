@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <link rel="stylesheet" href="https://unpkg.com/@asyncapi/react-component@latest/styles/default.min.css">
+  </head>
+  <body>
+
+    <div id="asyncapi"></div>
+
+    <script src="https://unpkg.com/@asyncapi/react-component@latest/browser/standalone/index.js"></script>
+    <script>
+
+      function parseQueryString() {
+        var str = window.location.search;
+        var objURL = {};
+
+        str.replace(
+            new RegExp( "([^?=&]+)(=([^&]*))?", "g" ),
+            function( $0, $1, $2, $3 ){
+                objURL[ $1 ] = $3;
+            }
+        );
+        return objURL;
+      };
+
+      var asyncapi_spec = parseQueryString()['spec'];
+      AsyncApiStandalone.render({
+        schema: {
+          url: asyncapi_spec,
+          options: { method: "GET", mode: "cors" },
+        },
+        config: {
+          show: {
+            sidebar: true,
+          }
+        },
+      }, document.getElementById('asyncapi'));
+    </script>
+
+  </body>
+</html>

@@ -4,16 +4,16 @@ channels:
     publish:
       message:
         oneOf:
-        - $ref: '#/components/messages/Get_Asyncapi_Yaml'
-        - $ref: '#/components/messages/My_Event_No_Typing'
-        - $ref: '#/components/messages/My_Event_Dict'
-        - $ref: '#/components/messages/My_Event_And_Emit_Dict'
-        - $ref: '#/components/messages/My_Event_And_Emit_Str'
-        - $ref: '#/components/messages/My_Event_And_Emit_Str_With_Ack'
-        - $ref: '#/components/messages/My_Event_Basemodel'
-        - $ref: '#/components/messages/My_Event_Basemodel_With_Ack'
-        - $ref: '#/components/messages/Connect'
-        - $ref: '#/components/messages/Disconnect'
+        - $ref: '#/components/messages/get_asyncapi_yaml'
+        - $ref: '#/components/messages/my_event_no_typing'
+        - $ref: '#/components/messages/my_event_dict'
+        - $ref: '#/components/messages/my_event_and_emit_dict'
+        - $ref: '#/components/messages/my_event_and_emit_str'
+        - $ref: '#/components/messages/my_event_and_emit_str_with_ack'
+        - $ref: '#/components/messages/my_event_basemodel'
+        - $ref: '#/components/messages/my_event_basemodel_with_ack'
+        - $ref: '#/components/messages/connect'
+        - $ref: '#/components/messages/disconnect'
     subscribe:
       message:
         oneOf:
@@ -26,98 +26,99 @@ channels:
     publish:
       message:
         oneOf:
-        - $ref: '#/components/messages/My_Event_Ns'
+        - $ref: '#/components/messages/my_event_ns'
     subscribe:
       message:
         oneOf: []
 components:
   messages:
-    Connect:
+    connect:
       description: ''
       name: connect
       payload:
         $ref: '#/components/schemas/NoSpec'
-        deprecated: false
+      title: Connect
       x-ack:
         $ref: '#/components/schemas/NoSpec'
-    Disconnect:
+    disconnect:
       description: ''
       name: disconnect
       payload:
         $ref: '#/components/schemas/NoSpec'
-        deprecated: false
+      title: Disconnect
       x-ack:
         $ref: '#/components/schemas/NoSpec'
-    Get_Asyncapi_Yaml:
+    get_asyncapi_yaml:
       description: generate and returns a asyncapi yaml schema
       name: get_asyncapi_yaml
       payload:
         $ref: '#/components/schemas/NoSpec'
-        deprecated: false
+      title: Get_Asyncapi_Yaml
       x-ack:
         type: string
-    My_Event_And_Emit_Dict:
+    my_event_and_emit_dict:
       description: 'demonstrates and receive event and emit payload as dict '
       name: my_event_and_emit_dict
       payload:
-        deprecated: false
         type: object
+      title: My_Event_And_Emit_Dict
       x-ack:
         $ref: '#/components/schemas/NoSpec'
-    My_Event_And_Emit_Str:
+    my_event_and_emit_str:
       description: 'demonstrates and receive event and emit payload as str '
       name: my_event_and_emit_str
       payload:
-        deprecated: false
         type: string
+      title: My_Event_And_Emit_Str
       x-ack:
         $ref: '#/components/schemas/NoSpec'
-    My_Event_And_Emit_Str_With_Ack:
+    my_event_and_emit_str_with_ack:
       description: 'demonstrates and receive event and emit payload as str '
       name: my_event_and_emit_str_with_ack
       payload:
-        deprecated: false
         type: string
+      title: My_Event_And_Emit_Str_With_Ack
       x-ack:
         type: string
-    My_Event_Basemodel:
+    my_event_basemodel:
       description: demonstrates use of a pydantic basemodel for event receive and
         emit
       name: my_event_basemodel
       payload:
         $ref: '#/components/schemas/MyDataModel'
-        deprecated: false
+      title: My_Event_Basemodel
       x-ack:
         $ref: '#/components/schemas/NoSpec'
-    My_Event_Basemodel_With_Ack:
+    my_event_basemodel_with_ack:
       description: demonstrates use of a pydantic basemodel for event receive, emit
         and acknowledge
       name: my_event_basemodel_with_ack
       payload:
         $ref: '#/components/schemas/MyDataModel'
-        deprecated: false
+      title: My_Event_Basemodel_With_Ack
       x-ack:
         $ref: '#/components/schemas/MyDataModel'
-    My_Event_Dict:
+    my_event_dict:
       description: demonstrates and receive event, payload as dict and emit without
         type information (dict used)
       name: my_event_dict
       payload:
-        deprecated: false
         type: object
+      title: My_Event_Dict
       x-ack:
         $ref: '#/components/schemas/NoSpec'
-    My_Event_No_Typing:
+    my_event_no_typing:
       description: demonstrates and receive event and emit without type information
         (dict used)
       name: my_event_no_typing
-    My_Event_Ns:
+      title: My_Event_No_Typing
+    my_event_ns:
       description: demonstrates use of a pydantic basemodel for event receive and
         emit
       name: my_event_ns
       payload:
         $ref: '#/components/schemas/MyDataModel'
-        deprecated: false
+      title: My_Event_Ns
       x-ack:
         $ref: '#/components/schemas/NoSpec'
     my_response_basemodel:
@@ -125,18 +126,15 @@ components:
       name: my_response_basemodel
       payload:
         $ref: '#/components/schemas/MyDataModel'
-        deprecated: false
     my_response_dict:
       description: ''
       name: my_response_dict
       payload:
-        deprecated: false
         type: object
     my_response_str:
       description: ''
       name: my_response_str
       payload:
-        deprecated: false
         type: string
   schemas:
     MyDataModel:
@@ -152,7 +150,6 @@ components:
       title: MyDataModel
       type: object
     NoSpec:
-      deprecated: false
       description: Specification is not provided
 info:
   description: 'Demo Server
