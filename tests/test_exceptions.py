@@ -116,3 +116,19 @@ async def test_default_exception_handler_emit(sio_context, model_type, model_val
     with pytest.raises((EmitValidationError, EmitValidationError)):
         await sio.emit(event_name, model_value)
     await asyncio.wait_for(future, timeout=TIMEOUT_1SEC)
+
+
+@pytest.mark.parametrize(*SIO_CONNECT_CFG)
+@pytest.mark.asyncio
+async def test_default_exception_handler_type_fail(sio_context):
+    with pytest.raises(ValueError):
+        # surpress wrong type; async is missing
+        # this should also be detected on runtime:
+        @sio.on_error_default  # type: ignore
+        def handler_exception(exp: int):
+            pass
+
+    with pytest.raises(ValueError):
+        # surpress wrong type; async is missing
+        # this should also be detected on runtime:
+        sio.on_error_default(None)  # type: ignore
