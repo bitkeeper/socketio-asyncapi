@@ -1,4 +1,5 @@
 import inspect
+import asyncio
 from typing import Callable, Optional, Type, Union
 
 from socketio import AsyncServer
@@ -7,23 +8,39 @@ from pydantic import BaseModel, ValidationError
 
 from socketio_asyncapi.asyncapi.docs import AsyncAPIDoc, NotProvidedType
 
+
 class BaseValildationError(ValidationError):
     @classmethod
-    def init_from_super(cls, parent: ValidationError) ->  "BaseValildationError":
+    def init_from_super(cls, parent: ValidationError) -> "BaseValildationError":
         """Initialize EmitValidationError from parent ValidationError"""
         return cls(
             errors=parent.raw_errors,
             model=parent.model,
         )
 
+
 class RequestValidationError(BaseValildationError):
     pass
 
-class ResponseValidationError(BaseValildationError):
-    pass
+# class ResponseValidationError(BaseValildationError):
+#     pass
 
-class EmitValidationError(BaseValildationError):
-    pass
+# class EmitValidationError(BaseValildationError):
+#     pass
+
+# TODO: merg into one exeception type to emit validation
+
+
+class EmitValidationError(Exception):
+    def __init__(self, message, event_name):
+        super().__init__(message)
+        self.event_name = event_name
+
+
+class ResponseValidationError(Exception):
+    def __init__(self, message, event_name):
+        super().__init__(message)
+        self.event_name = event_name
 
 
 class AsyncAPISocketIO(AsyncServer):
@@ -79,7 +96,13 @@ class AsyncAPISocketIO(AsyncServer):
                 server_name=server_name,
             )
         super().__init__(*args, **kwargs)
-        self.emit_models: dict[str, Type[BaseModel]] = {}
+        # self.emit_models: dict[str, Type[BaseModel]] = {}
+        self.emit_models: dict[str, Optional[Type[Union[BaseModel,
+                                                        int, str, bool, float, dict]]]] = {}
+
+        self.exception_handlers: dict[str, Callable] = {}
+        # TODO: set type to coroutine
+        self.default_exception_handler: Optional[Callable] = None
 
     async def emit(self, event: str, *args, **kwargs):
         """
@@ -90,18 +113,29 @@ class AsyncAPISocketIO(AsyncServer):
         if self.validate:
             model = self.emit_models.get(event)
             if model is not None:
-                if issubclass(model, BaseModel):
-                    try:
-                        model.validate(args[0])
-                    except ValidationError as e:
-                        logger.error(f"Error validating emit '{event}': {e}")
-                        raise EmitValidationError.init_from_super(e)
-                elif not(isinstance(args[0], model)):
-                    logger.error(f"Error validating emit '{event}': data doesn't match the required datatype")
+                try:
+                    if issubclass(model, BaseModel) and isinstance(args[0], model):
+                        # args[0] = args[0].dict()
+                        args = (args[0].dict(), *args[1:])
+                    # elif issubclass(model, BaseModel) and isinstance(args[0], dict):
+                    #     try:
+                    #         model.validate(args[0])
+                    #     except ValidationError as e:
+                    #         logger.error(f"Error validating emit '{event}': {e}")
+                    #         raise EmitValidationError.init_from_super(e)
+                    elif not (isinstance(args[0], model)):
+                        message = f"Error validating emit '{event}': data doesn't match the required datatype {model.__name__}"
+                        logger.error(message)
+                        raise EmitValidationError(message, event)
+                except Exception as exc:
+                    err_handler = self.default_exception_handler
+                    if err_handler is None:
+                        raise
+                    return await err_handler(exc)
 
         return await super().emit(event, *args, **kwargs)
 
-    def doc_emit(self, event: str, model: Type[BaseModel], namespace=None, discription: str = ""):
+    def doc_emit(self, event: str, model: Optional[Type[Union[BaseModel, int, str, bool, float, dict]]], namespace=None, discription: str = ""):
         """
         Decorator to register/document a SocketIO emit event. This will be
         used to generate AsyncAPI specs and validate emits calls.
@@ -112,11 +146,13 @@ class AsyncAPISocketIO(AsyncServer):
         """
         def decorator(func):
             if self.emit_models.get(event):
-                if self.emit_models.get(event)!=model:
-                    raise ValueError(f"Event {event} already registered with different model {model.__name__}")
+                if self.emit_models.get(event) != model:
+                    raise ValueError(
+                        f"Event {event} already registered with different model {model.__name__}")
             else:
                 self.emit_models[event] = model
-                self.asyncapi_doc.add_new_sender(namespace, event, model, discription)
+                self.asyncapi_doc.add_new_sender(
+                    namespace, event, model, discription)
             return func
         return decorator
 
@@ -126,8 +162,10 @@ class AsyncAPISocketIO(AsyncServer):
             namespace=None,
             *,
             get_from_typehint: bool = True,
-            response_model: Optional[Union [Type[BaseModel], NotProvidedType]] = None,
-            request_model: Optional[Union [Type[BaseModel], NotProvidedType]] = None,
+            response_model: Optional[Union[Type[BaseModel],
+                                           NotProvidedType]] = None,
+            request_model: Optional[Union[Type[BaseModel],
+                                          NotProvidedType]] = None,
     ):
         """Decorator to register a SocketIO event handler with additional functionalities
 
@@ -152,12 +190,14 @@ class AsyncAPISocketIO(AsyncServer):
                 except IndexError:
                     posible_request_model = None
                 else:
-                    posible_request_model = handler.__annotations__.get(first_arg_name, "NotProvided")
-                posible_response_model = handler.__annotations__.get("return", "NotProvided")
+                    posible_request_model = handler.__annotations__.get(
+                        first_arg_name, "NotProvided")
+                posible_response_model = handler.__annotations__.get(
+                    "return", "NotProvided")
                 if request_model is None:
-                    request_model = posible_request_model # type: ignore
+                    request_model = posible_request_model  # type: ignore
                 if response_model is None:
-                    response_model = posible_response_model # type: ignore
+                    response_model = posible_response_model  # type: ignore
 
             # print(f"request_model: {request_model}")
             # print(f"response_model: {response_model}")
@@ -173,19 +213,64 @@ class AsyncAPISocketIO(AsyncServer):
 
             async def wrapper(*args, **kwargs):
                 new_handler = self._handle_all(
+                    message,
                     request_model=request_model,
                     response_model=response_model
                 )(handler)
                 return await new_handler(*args, **kwargs)
 
             # Decorate with SocketIO.on decorator
-            super(AsyncAPISocketIO, self).on(message, namespace=namespace)(wrapper)
+            super(AsyncAPISocketIO, self).on(
+                message, namespace=namespace)(wrapper)
             return wrapper
         return decorator
 
+    def on_error_default(self, exception_handler: Callable):
+        """Decorator to define a default error handler for SocketIO events.
+
+        This decorator can be applied to a function that acts as a default
+        error handler for any namespaces that do not have a specific handler.
+        Example::
+
+            @socketio.on_error_default
+            def error_handler(e):
+                print('An error has occurred: ' + str(e))
+        """
+        if not callable(exception_handler):
+            raise ValueError('exception_handler must be callable')
+        self.default_exception_handler = exception_handler
+        return exception_handler
+
+    # def on_error(self, namespace=None):
+    #     """Decorator to define a custom error handler for SocketIO events.
+
+    #     This decorator can be applied to a function that acts as an error
+    #     handler for a namespace. This handler will be invoked when a SocketIO
+    #     event handler raises an exception. The handler function must accept one
+    #     argument, which is the exception raised. Example::
+
+    #         @socketio.on_error(namespace='/chat')
+    #         def chat_error_handler(e):
+    #             print('An error has occurred: ' + str(e))
+
+    #     :param namespace: The namespace for which to register the error
+    #                       handler. Defaults to the global namespace.
+    #     """
+    #     namespace = namespace or '/'
+
+    #     def decorator(exception_handler):
+    #         if not callable(exception_handler):
+    #             raise ValueError('exception_handler must be callable')
+    #         self.exception_handlers[namespace] = exception_handler
+    #         return exception_handler
+    #     return decorator
+
     def _handle_all(self,
-                    response_model: Optional[Union [Type[BaseModel], NotProvidedType]] = None,
-                    request_model: Optional[Union [Type[BaseModel], NotProvidedType]] = None,
+                    message: str,
+                    response_model: Optional[Union[Type[BaseModel],
+                                                   NotProvidedType]] = None,
+                    request_model: Optional[Union[Type[BaseModel],
+                                                  NotProvidedType]] = None,
                     ):
         """Decorator to validate request and response with pydantic models
         Args:
@@ -204,45 +289,70 @@ class AsyncAPISocketIO(AsyncServer):
                 did_request_came_as_arg = False
                 request = None
                 # check if request is in args or kwargs
-                if len(args) > 0:
+                if len(args) > 1:
                     did_request_came_as_arg = True
-                    request = args[0]
+                    request = args[-1]
                 if not request:
                     did_request_came_as_arg = False
                     request = kwargs.get("request")
 
                 # if there is a request in args or kwargs, validate it
-                if request:
-                    try:
-                        if self.validate and request_model and \
-                            isinstance(request_model, type(BaseModel)):
-                            request_model.validate(request) # type: ignore
-                    except ValidationError as e:
-                        logger.error(f"ValidationError for incoming request: {e}")
-                        raise RequestValidationError.init_from_super(e)
+                try:
+                    if request and self.validate and request_model and request_model != NotProvidedType and request_model != 'NotProvided':
+                        if issubclass(request_model, BaseModel):
+                            try:
+                                request_model.validate(request)  # type: ignore
+                            except ValidationError as e:
+                                logger.error(
+                                    f"ValidationError for incoming request: {e}")
+                                raise RequestValidationError.init_from_super(e)
 
-                    # convert request to pydantic model if request_model is provided
-                    if request_model and isinstance(request_model, type(BaseModel)):
-                        request = request_model.parse_obj(request) # type: ignore
+                            request = request_model.parse_obj(
+                                request)  # type: ignore
+                        else:  # not a base model
+                            try:
+                                request = request_model(request)
+                            except ValueError as exc:
+                                logger.error(
+                                    "ValidationError for incoming request")
+                                raise RequestValidationError(
+                                    errors=[], model=request_model)
+
                         if did_request_came_as_arg:
-                            args = (request, *args[1:])
+                            args = (args[0], request, *args[2:])
                         else:
                             kwargs["request"] = request
 
-                # call handler with converted request and validate response
-                response = await handler(*args, **kwargs)
-                if response:
-                    try:
-                        if self.validate and response_model and \
-                            isinstance(response_model, type(BaseModel)):
-                            response_model.validate(response) # type: ignore
-                    except ValidationError as e:
-                        logger.error(f"ValidationError for outgoing response: {e}")
-                        raise ResponseValidationError.init_from_super(e)
+                    # call handler with converted request and validate response
+                    if asyncio.iscoroutinefunction(handler):
+                        response = await handler(*args, **kwargs)
+                    else:
+                        response = handler(*args, **kwargs)
 
+                    if response:
+                        if isinstance(response, response_model) is False:
+                            # TODO: we require the event name in the handler for correct logging and exception handling
+                            # event= message
+                            reason = f"Error validating reponse '{message}': data doesn't match the required datatype {response_model.__name__}"
+                            logger.error(reason)
+                            raise ResponseValidationError(
+                                message=reason, event_name=message)
+
+                except Exception as exc:
+                    # err_handler = self.exception_handlers.get(
+                    #     namespace, self.default_exception_handler)
+                    err_handler = self.default_exception_handler
+                    if err_handler is None:
+                        return
+                        # raise
+                    # _type, value, traceback = sys.exc_info()
+                    if asyncio.iscoroutinefunction(handler):
+                        response = await err_handler(exc)
+                    else:
+                        response = err_handler(exc)
                 # if response is a pydantic model, convert it to json
                 if isinstance(response, BaseModel):
-                    return response.json()
+                    return response.dict()
                 else:
                     return response
 
