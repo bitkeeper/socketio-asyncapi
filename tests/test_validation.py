@@ -217,3 +217,26 @@ async def test_emit_type_validation_fail(sio_context, model_type, model_value):
 
     with pytest.raises((EmitValidationError, EmitValidationError)):
         await sio.emit(event_name, model_value)
+
+
+@pytest.mark.parametrize(*SIO_CONNECT_CFG)
+@pytest.mark.asyncio
+async def test_doc_emit_twice(sio_context):
+    event_name = 'emit_doc_emit_twice'
+    # remove_event_handler(event_name)
+
+    sio.doc_emit(event_name, int)(None)
+    # Should not fail because event is registered with the same type as the first time
+    sio.doc_emit(event_name, int)(None)
+
+
+@pytest.mark.parametrize(*SIO_CONNECT_CFG)
+@pytest.mark.asyncio
+async def test_doc_emit_twice_fail(sio_context):
+    event_name = 'emit_doc_emit_twice_fail'
+    # remove_event_handler(event_name)
+
+    sio.doc_emit(event_name, int)(None)
+    # Should fail because event is already registered with different type
+    with pytest.raises(ValueError):
+        sio.doc_emit(event_name, str)(None)
