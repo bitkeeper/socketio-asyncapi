@@ -1,12 +1,16 @@
 import inspect
 import asyncio
-from typing import Callable, Optional, Type, Union
+from typing import Optional, Type, Union, Awaitable, Any
+from collections.abc import Callable
 
 from socketio import AsyncServer
 from loguru import logger
 from pydantic import BaseModel, ValidationError
 
 from socketio_asyncapi.asyncapi.docs import AsyncAPIDoc, NotProvidedType
+
+MessageHandler = Callable[..., Awaitable[Any]]
+ExceptionHandler = Callable[[Exception], Awaitable[Any]]
 
 
 class BaseValildationError(ValidationError):
@@ -97,12 +101,10 @@ class AsyncAPISocketIO(AsyncServer):
             )
         super().__init__(*args, **kwargs)
         # self.emit_models: dict[str, Type[BaseModel]] = {}
-        self.emit_models: dict[str, Optional[Type[Union[BaseModel,
-                                                        int, str, bool, float, dict]]]] = {}
+        self.emit_models: dict[str, Optional[Type[Union[BaseModel, int, str, bool, float, dict]]]] = {}
 
-        self.exception_handlers: dict[str, Callable] = {}
-        # TODO: set type to coroutine
-        self.default_exception_handler: Optional[Callable] = None
+        self.exception_handlers: dict[str, ExceptionHandler] = {}
+        self.default_exception_handler: Optional[ExceptionHandler] = None
 
     async def emit(self, event: str, *args, **kwargs):
         """
@@ -180,7 +182,7 @@ class AsyncAPISocketIO(AsyncServer):
             request_model (Optional[Type[BaseModel]], optional): Request payload model used
                 for validation and documentation. Defaults to None.
         """
-        def decorator(handler: Callable):
+        def decorator(handler: MessageHandler):
 
             nonlocal request_model
             nonlocal response_model
@@ -220,12 +222,11 @@ class AsyncAPISocketIO(AsyncServer):
                 return await new_handler(*args, **kwargs)
 
             # Decorate with SocketIO.on decorator
-            super(AsyncAPISocketIO, self).on(
-                message, namespace=namespace)(wrapper)
+            super(AsyncAPISocketIO, self).on(message, namespace=namespace)(wrapper)
             return wrapper
         return decorator
 
-    def on_error_default(self, exception_handler: Callable):
+    def on_error_default(self, exception_handler: ExceptionHandler) -> ExceptionHandler:
         """Decorator to define a default error handler for SocketIO events.
 
         This decorator can be applied to a function that acts as a default
@@ -236,7 +237,7 @@ class AsyncAPISocketIO(AsyncServer):
             def error_handler(e):
                 print('An error has occurred: ' + str(e))
         """
-        if not callable(exception_handler):
+        if not callable(exception_handler) or not asyncio.iscoroutinefunction(exception_handler):
             raise ValueError('exception_handler must be callable')
         self.default_exception_handler = exception_handler
         return exception_handler
@@ -283,7 +284,7 @@ class AsyncAPISocketIO(AsyncServer):
         Raises: RequestValidationError, ResponseValidationError
         """
 
-        def decorator(handler: Callable):
+        def decorator(handler: MessageHandler):
 
             async def wrapper(*args, **kwargs):
                 did_request_came_as_arg = False
@@ -324,10 +325,7 @@ class AsyncAPISocketIO(AsyncServer):
                             kwargs["request"] = request
 
                     # call handler with converted request and validate response
-                    if asyncio.iscoroutinefunction(handler):
-                        response = await handler(*args, **kwargs)
-                    else:
-                        response = handler(*args, **kwargs)
+                    response = await handler(*args, **kwargs)
 
                     if response:
                         if isinstance(response, response_model) is False:
@@ -344,12 +342,7 @@ class AsyncAPISocketIO(AsyncServer):
                     err_handler = self.default_exception_handler
                     if err_handler is None:
                         return
-                        # raise
-                    # _type, value, traceback = sys.exc_info()
-                    if asyncio.iscoroutinefunction(handler):
-                        response = await err_handler(exc)
-                    else:
-                        response = err_handler(exc)
+                    response = await err_handler(exc)
                 # if response is a pydantic model, convert it to json
                 if isinstance(response, BaseModel):
                     return response.dict()
