@@ -42,7 +42,7 @@ async def sio_context(aiohttp_server,
     port_used = unused_tcp_port_factory()
     await aiohttp_server(app, port=port_used)
 
-    client = sio = sio_client_type()
+    client = sio_client_type()
     await client.connect(f'http://localhost:{port_used}',  transports=['websocket'])
     sio_context_info = SioContextInfo(port_used, sio_server, app, client)
     yield sio_context_info
