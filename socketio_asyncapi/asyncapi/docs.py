@@ -3,7 +3,7 @@ AsycnAPI [https://studio.asyncapi.com/] documentation auto generation.
 """
 import json
 import textwrap
-from typing import Callable, Literal, Optional, Type, Union
+from typing import Callable, Optional, Union
 
 import yaml
 from loguru import logger
@@ -14,16 +14,16 @@ from socketio_asyncapi.asyncapi.models.message import Message
 
 from .utils import add_ref_prepath
 
-NotProvidedType = Literal["NotProvided"]
+from .types import NotProvidedType, PAYLOAD_TYPES
 
-add_description ="""
+add_description = """
 <br/> AsyncAPI currently does not support Socket.IO binding and Web Socket like syntax used for now.
 In order to add support for Socket.IO ACK value, AsyncAPI is extended with with x-ack keyword.
 This documentation should **NOT** be used for generating code due to these limitations.
 """
 
 default_channels = yaml.safe_load(
-"""
+    """
 /:
   publish:
     message:
@@ -39,7 +39,7 @@ default_channels = yaml.safe_load(
 )
 
 default_components = yaml.safe_load(
-"""
+    """
 messages:
 
 schemas:
@@ -54,14 +54,14 @@ class AsyncAPIDoc(AsyncAPIBase):
 
     @classmethod
     def default_init(cls,
-        version: str = "1.0.0",
-        title: str = "Demo Chat API",
-        description: str = "Demo Chat API",
-        server_url: str = "http://localhost:5000",
-        server_name: str = "BACKEND",
-        server_protocol: str = "socketio",
-        server_protocolVersion: str = "5"
-    ) -> "AsyncAPIDoc":
+                     version: str = "1.0.0",
+                     title: str = "Demo Chat API",
+                     description: str = "Demo Chat API",
+                     server_url: str = "http://localhost:5000",
+                     server_name: str = "BACKEND",
+                     server_protocol: str = "socketio",
+                     server_protocolVersion: str = "5"
+                     ) -> "AsyncAPIDoc":
         """Initialize AsyncAPI documentation generator."""
         logger.info(f"{server_url=}, {server_name=}, {server_protocol=}")
         default_channels["/"]["subscribe"]["message"]["oneOf"] = []
@@ -78,7 +78,7 @@ class AsyncAPIDoc(AsyncAPIBase):
                     "url": server_url,
                     "protocol": server_protocol,
                     "protocolVersion": server_protocolVersion
-                    }},
+                }},
             "asyncapi": "2.5.0",
             "channels": default_channels,
             "components": default_components,
@@ -97,14 +97,14 @@ class AsyncAPIDoc(AsyncAPIBase):
         )
 
     def add_new_receiver(
-            self,
-            handler: Callable,
-            namespace: Optional[str],
-            name: str,
-            message_name=None,
-            ack_data_model: Optional[Union[Type[BaseModel], NotProvidedType]] = None,
-            payload_model: Optional[Union[Type[BaseModel], NotProvidedType]] = None,
-        ) -> None:
+        self,
+        handler: Callable,
+        namespace: Optional[str],
+        name: str,
+        message_name=None,
+        ack_data_model: Optional[Union[PAYLOAD_TYPES, NotProvidedType]] = None,
+        payload_model: Optional[Union[PAYLOAD_TYPES, NotProvidedType]] = None,
+    ) -> None:
         if message_name is None:
             message_name = name.title()
 
@@ -112,17 +112,17 @@ class AsyncAPIDoc(AsyncAPIBase):
         if ack_data_model == "NotProvided":
             ack = {"$ref": "#/components/schemas/NoSpec"}
         elif isinstance(ack_data_model, type(BaseModel)):
-            ack_schema_name = ack_data_model.__name__ # type: ignore
+            ack_schema_name = ack_data_model.__name__  # type: ignore
             ack = {"$ref": f"#/components/schemas/{ack_schema_name}"}
-            ack_schema = ack_data_model.schema() # type: ignore
+            ack_schema = ack_data_model.schema()  # type: ignore
             add_ref_prepath(ack_schema, f"/components/schemas/{ack_schema_name}")
-            self.components.schemas[ack_schema_name] = ack_schema # type: ignore
+            self.components.schemas[ack_schema_name] = ack_schema  # type: ignore
 
         elif ack_data_model:
             ack_schema = {}
             schema.add_field_type_to_schema(ack_data_model, ack_schema)
-            if len(ack_schema)>=1:
-                ack= ack_schema
+            if len(ack_schema) >= 1:
+                ack = ack_schema
             else:
                 ack = None
         else:
@@ -131,16 +131,16 @@ class AsyncAPIDoc(AsyncAPIBase):
         if payload_model == "NotProvided":
             payload = {"$ref": "#/components/schemas/NoSpec"}
         elif isinstance(payload_model, type(BaseModel)):
-            payload_schema_name = payload_model.__name__ # type: ignore
+            payload_schema_name = payload_model.__name__  # type: ignore
             payload = {"$ref": f"#/components/schemas/{payload_schema_name}"}
-            payload_schema = payload_model.schema() # type: ignore
+            payload_schema = payload_model.schema()  # type: ignore
             add_ref_prepath(payload_schema, f"/components/schemas/{payload_schema_name}")
-            self.components.schemas[payload_schema_name] = payload_schema # type: ignore
+            self.components.schemas[payload_schema_name] = payload_schema  # type: ignore
         elif payload_model:
             payload_schema = {}
             schema.add_field_type_to_schema(payload_model, payload_schema)
-            if len(payload_schema)>=1:
-                payload= payload_schema
+            if len(payload_schema) >= 1:
+                payload = payload_schema
             else:
                 payload = None
         else:
@@ -150,7 +150,7 @@ class AsyncAPIDoc(AsyncAPIBase):
         new_message = {
             "name": name,
             "title": message_name,
-            "description": handler.__doc__ if  handler.__doc__ else "",
+            "description": handler.__doc__ if handler.__doc__ else "",
             "x-ack": None,
         }
         message_name = name
@@ -172,48 +172,51 @@ class AsyncAPIDoc(AsyncAPIBase):
         # add to sub
         one_of = {"$ref": f"#/components/messages/{message_name}"}
         channel = self._get_channel(namespace)
-        if channel:
-              channel.publish.message.__dict__["oneOf"].append(one_of)
+        if channel and channel.publish:
+            channel.publish.message.__dict__["oneOf"].append(one_of)
 
     def add_new_sender(
             self,
-            namespace: None,
+            namespace: Optional[str],
             event: str,
-            payload_model: Optional[Union[Type[BaseModel], NotProvidedType]] = None,
-            description: Optional[str] = None,
-        ) -> None:
+            payload_model: Optional[Union[PAYLOAD_TYPES, NotProvidedType]] = None,
+
+        description: Optional[str] = None,
+    ) -> None:
         """Generate new sender documentation for AsyncAPI."""
         if payload_model == "NotProvided":
             payload = {"$ref": "#/components/schemas/NoSpec"}
         elif isinstance(payload_model, type(BaseModel)):
-            payload_schema_name = payload_model.__name__ # type: ignore
-            payload_schema = payload_model.schema() # type: ignore
+            payload_schema_name = payload_model.__name__  # type: ignore
+            payload_schema = payload_model.schema()  # type: ignore
             payload = {"$ref": f"#/components/schemas/{payload_schema_name}"}
-            add_ref_prepath(payload_schema, f"/components/schemas/{payload_schema_name}") # type: ignore
-            self.components.schemas[payload_schema_name] = payload_schema # type: ignore
+            add_ref_prepath(payload_schema, f"/components/schemas/{payload_schema_name}")  # type: ignore
+            self.components.schemas[payload_schema_name] = payload_schema  # type: ignore
         elif payload_model:
             payload_schema = {}
             schema.add_field_type_to_schema(payload_model, payload_schema)
-            if len(payload_schema)>=1:
-                payload= payload_schema
+            if len(payload_schema) >= 1:
+                payload = payload_schema
             else:
                 payload = None
         else:
             payload = None
 
+        # remove multiple spaces so yaml dump does not try to escape them
+        if description:
+            # add single indent at the beginning if not present
+            if not (description).startswith(" "):
+                description = " " + description
+            description = textwrap.dedent(description)
+        else:
+            description = ""
+
         # create new message
         new_message = {
             "name": event,
-            "description": description if description else "",
+            "description": description,
             "payload": payload,
         }
-
-        # remove multiple spaces so yaml dump does not try to escape them
-        if new_message["description"]:
-            # add single indent at the beginning if not present
-            if not new_message["description"].startswith(" "):
-                new_message["description"] = " " + new_message["description"]
-            new_message["description"] = textwrap.dedent(new_message["description"])
 
         # add message to spec
         if self.components and self.components.messages is not None:
@@ -222,25 +225,25 @@ class AsyncAPIDoc(AsyncAPIBase):
         # add to pub
         one_of = {"$ref": f"#/components/messages/{event}"}
         channel = self._get_channel(namespace)
-        if channel:
-              channel.subscribe.message.__dict__["oneOf"].append(one_of)
+        if channel and channel.subscribe:
+            channel.subscribe.message.__dict__["oneOf"].append(one_of)
 
-    def _get_channel(self, namespace: Optional[str]) ->ChannelItem:
+    def _get_channel(self, namespace: Optional[str]) -> ChannelItem:
         '''Get specific channel, if not already present create it'''
         channel_id: str = namespace if namespace else '/'
         if channel_id not in self.channels:
             self.channels[channel_id] = ChannelItem.parse_obj(
-                                        {
-                                        "publish": {
-                                            "message": {
-                                            "oneOf": []
-                                            }
-                                        },
-                                        "subscribe": {
-                                            "message": {
-                                            "oneOf": []
-                                            }
-                                        }
-                                        }
-                                    )
+                {
+                    "publish": {
+                        "message": {
+                            "oneOf": []
+                        }
+                    },
+                    "subscribe": {
+                        "message": {
+                            "oneOf": []
+                        }
+                    }
+                }
+            )
         return self.channels[channel_id]

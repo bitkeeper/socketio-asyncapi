@@ -1,7 +1,7 @@
 import pathlib
 from subprocess import check_call
 
-from .fixtures import socketio
+from .download_app import socketio
 
 
 def test_validate_asycnapi_doc():

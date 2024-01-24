@@ -3,11 +3,8 @@ import logging
 import pathlib
 from pathlib import Path
 from typing import Optional, List
-import pytest
-from loguru import logger
-from pydantic import AnyUrl, BaseModel, Field
+from pydantic import AnyUrl, BaseModel, Field, parse_obj_as
 
-from socketio import AsyncSimpleClient
 from socketio_asyncapi import (
     RequestValidationError, ResponseValidationError, EmitValidationError)
 from socketio_asyncapi import AsyncAPISocketIO as SocketIO
@@ -91,6 +88,8 @@ async def get_download_list_fail() -> None:
     Get current list of files to download
     """
     await socketio.emit('current_list', {"downloader_queue": ["WRONG_URL",]})
+    # url: AnyUrl = parse_obj_as(AnyUrl, "WRONG_URL")
+    # await socketio.emit('current_list', DownloaderQueueEmitModel(downloader_queue=[url]))
 
 
 @socketio.on('download_file', get_from_typehint=True)

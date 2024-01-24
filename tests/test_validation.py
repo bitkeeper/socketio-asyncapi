@@ -9,7 +9,7 @@ This test test the type validation of:
 import asyncio
 import pytest
 from pydantic import BaseModel
-from socketio import AsyncSimpleClient
+from socketio import AsyncSimpleClient  # type: ignore[import-untyped]
 from socketio_asyncapi import AsyncAPISocketIO
 
 from socketio_asyncapi import EmitValidationError
@@ -47,7 +47,7 @@ def remove_event_handler(event_name: str) -> None:
         del sio.emit_models[event_name]
 
 
-SIO_CONNECT_CFG = ['sio_server,sio_client_type', [(sio, AsyncSimpleClient)]]
+SIO_CONNECT_CFG = ('sio_server,sio_client_type', [(sio, AsyncSimpleClient)])
 
 
 @pytest.mark.parametrize(*SIO_CONNECT_CFG)
@@ -83,7 +83,7 @@ async def test_request_validation(sio_context, model_type, model_value):
     remove_event_handler(event_name)
 
     @sio.on(event_name)
-    async def on_message_received(sid, data: model_type):
+    async def on_message_received(sid: str, data: model_type):
         print(f"Server received: {data}")
         future.set_result(data)
 

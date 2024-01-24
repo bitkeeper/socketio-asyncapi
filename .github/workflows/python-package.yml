@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.8", "3.9", "3.10", "3.11"]
+        python-version: ["3.10", "3.11"]
 
     steps:
     - uses: actions/checkout@v3
@@ -60,7 +60,7 @@ jobs:
     - name: Run tests
       run: |
         source .venv/bin/activate
-        pytest tests -v --cov=./src/sio_asyncapi --cov-report=xml:./coverage.xml --cov-report term-missing
+        pytest tests -v --cov=./src/socketio_asyncapi --cov-report=xml:./coverage.xml --cov-report term-missing
         coverage report
 
     - name: Upload coverage to Codecov

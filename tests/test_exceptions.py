@@ -7,7 +7,7 @@ This test the use of custom exception handlers for:
 
 import asyncio
 import pytest
-from socketio import AsyncSimpleClient
+from socketio import AsyncSimpleClient   # type: ignore
 from socketio_asyncapi import AsyncAPISocketIO
 from socketio_asyncapi import RequestValidationError, ResponseValidationError, EmitValidationError
 
@@ -38,7 +38,7 @@ def remove_event_handler(event_name: str) -> None:
         del sio.emit_models[event_name]
 
 
-SIO_CONNECT_CFG = ['sio_server,sio_client_type', [(sio, AsyncSimpleClient)]]
+SIO_CONNECT_CFG = ('sio_server,sio_client_type', [(sio, AsyncSimpleClient)])
 
 
 @pytest.mark.parametrize('model_type,model_value', [(int, "dsd")])
@@ -57,7 +57,7 @@ async def test_default_exception_handler_receive(sio_context, model_type, model_
         return
 
     @sio.on(event_name)
-    async def on_message_received(sid, data: model_type) -> model_type:
+    async def on_message_received(sid, data: model_type):
         return
 
     await sio_context.client.emit(event_name, model_value)

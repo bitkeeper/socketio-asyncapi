@@ -1,50 +1,57 @@
 import inspect
 import asyncio
-from typing import Optional, Type, Union, Awaitable, Any
+from typing import Optional, Union, Awaitable, Any, ParamSpec
 from collections.abc import Callable
 
-from socketio import AsyncServer
+from socketio import AsyncServer  # type: ignore[import-untyped]
 from loguru import logger
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, ValidationError, DictError
+from typeguard import check_type, TypeCheckError
+from socketio_asyncapi.asyncapi.docs import AsyncAPIDoc
 
-from socketio_asyncapi.asyncapi.docs import AsyncAPIDoc, NotProvidedType
+from socketio_asyncapi.asyncapi.types import NotProvidedType, PAYLOAD_INSTANCES, PAYLOAD_TYPES
 
-MessageHandler = Callable[..., Awaitable[Any]]
+
+# TODO: no strict enough:
+MP = ParamSpec('MP')
+MessageHandler = Callable[MP, Awaitable[PAYLOAD_INSTANCES | None]]
+""" Proto for handler that receives sockeio messages"""
+
 ExceptionHandler = Callable[[Exception], Awaitable[Any]]
+""" Proto for general handler that can handle exceptions during validation"""
 
 
-class BaseValildationError(ValidationError):
+class BaseValidationError(Exception):
+    """ Base for AsyncAPISocketIO model validation exceptions
+    """
+
+    def __init__(self, message: str, event_name: str, model: PAYLOAD_TYPES, exc: Exception | None = None):
+        super().__init__(message)
+        self.event_name: str = event_name
+        self.model: PAYLOAD_TYPES = model
+        self.internal_exception: Exception | None = exc
+
     @classmethod
-    def init_from_super(cls, parent: ValidationError) -> "BaseValildationError":
+    def init_from(cls,  message: str, event_name: str, model: PAYLOAD_TYPES, exc: Exception | None = None) -> "BaseValidationError":
         """Initialize EmitValidationError from parent ValidationError"""
         return cls(
-            errors=parent.raw_errors,
-            model=parent.model,
+            message=message,
+            event_name=event_name,
+            model=model,
+            exc=exc
         )
 
 
-class RequestValidationError(BaseValildationError):
-    pass
-
-# class ResponseValidationError(BaseValildationError):
-#     pass
-
-# class EmitValidationError(BaseValildationError):
-#     pass
-
-# TODO: merg into one exeception type to emit validation
+class RequestValidationError(BaseValidationError):
+    """ Raised when received event data can't be used to construct the required model"""
 
 
-class EmitValidationError(Exception):
-    def __init__(self, message, event_name):
-        super().__init__(message)
-        self.event_name = event_name
+class EmitValidationError(BaseValidationError):
+    """ Raised when emit event data is't the expected type"""
 
 
-class ResponseValidationError(Exception):
-    def __init__(self, message, event_name):
-        super().__init__(message)
-        self.event_name = event_name
+class ResponseValidationError(BaseValidationError):
+    """ Raised when return response data is't the expected type"""
 
 
 class AsyncAPISocketIO(AsyncServer):
@@ -75,7 +82,7 @@ class AsyncAPISocketIO(AsyncServer):
         description: str = "Demo Chat API",
         server_url: str = "http://localhost:5000",
         server_name: str = "BACKEND",
-        **kwargs,
+        ** kwargs,
     ):
         """Create AsycnAPISocketIO
 
@@ -100,8 +107,7 @@ class AsyncAPISocketIO(AsyncServer):
                 server_name=server_name,
             )
         super().__init__(*args, **kwargs)
-        # self.emit_models: dict[str, Type[BaseModel]] = {}
-        self.emit_models: dict[str, Optional[Type[Union[BaseModel, int, str, bool, float, dict]]]] = {}
+        self.emit_models: dict[str, PAYLOAD_TYPES] = {}
 
         self.exception_handlers: dict[str, ExceptionHandler] = {}
         self.default_exception_handler: Optional[ExceptionHandler] = None
@@ -116,28 +122,28 @@ class AsyncAPISocketIO(AsyncServer):
             model = self.emit_models.get(event)
             if model is not None:
                 try:
-                    if issubclass(model, BaseModel) and isinstance(args[0], model):
-                        # args[0] = args[0].dict()
-                        args = (args[0].dict(), *args[1:])
-                    # elif issubclass(model, BaseModel) and isinstance(args[0], dict):
-                    #     try:
-                    #         model.validate(args[0])
-                    #     except ValidationError as e:
-                    #         logger.error(f"Error validating emit '{event}': {e}")
-                    #         raise EmitValidationError.init_from_super(e)
-                    elif not (isinstance(args[0], model)):
+                    try:
+                        if check_type(args[0], model):
+                            if issubclass(model, BaseModel):
+                                args = (args[0].dict(), *args[1:])
+                            # elif issubclass(model, BaseModel) and isinstance(args[0], dict):
+                            #     try:
+                            #         model.validate(args[0])
+                            #     except ValidationError as e:
+                            #         logger.error(f"Error validating emit '{event}': {e}")
+                            #         raise EmitValidationError.init_from_super(e)
+                    except TypeCheckError as exc:
                         message = f"Error validating emit '{event}': data doesn't match the required datatype {model.__name__}"
                         logger.error(message)
-                        raise EmitValidationError(message, event)
+                        raise EmitValidationError.init_from(message, event, model, exc)
                 except Exception as exc:
                     err_handler = self.default_exception_handler
                     if err_handler is None:
                         raise
                     return await err_handler(exc)
+        return await super(AsyncAPISocketIO, self).emit(event, *args, **kwargs)
 
-        return await super().emit(event, *args, **kwargs)
-
-    def doc_emit(self, event: str, model: Optional[Type[Union[BaseModel, int, str, bool, float, dict]]], namespace=None, discription: str = ""):
+    def doc_emit(self, event: str, model: PAYLOAD_TYPES, namespace: Optional[str] = None, discription: str = ""):
         """
         Decorator to register/document a SocketIO emit event. This will be
         used to generate AsyncAPI specs and validate emits calls.
@@ -147,7 +153,7 @@ class AsyncAPISocketIO(AsyncServer):
             model (Type[BaseModel]): pydantic model
         """
         def decorator(func):
-            if self.emit_models.get(event):
+            if event in self.emit_models:
                 if self.emit_models.get(event) != model:
                     raise ValueError(
                         f"Event {event} already registered with different model {model.__name__}")
@@ -160,14 +166,12 @@ class AsyncAPISocketIO(AsyncServer):
 
     def on(
             self,
-            message,
-            namespace=None,
+            message: str,
+            namespace: str | None = None,
             *,
             get_from_typehint: bool = True,
-            response_model: Optional[Union[Type[BaseModel],
-                                           NotProvidedType]] = None,
-            request_model: Optional[Union[Type[BaseModel],
-                                          NotProvidedType]] = None,
+            response_model: Optional[Union[PAYLOAD_TYPES, NotProvidedType]] = None,
+            request_model: Optional[Union[PAYLOAD_TYPES, NotProvidedType]] = None,
     ):
         """Decorator to register a SocketIO event handler with additional functionalities
 
@@ -182,10 +186,11 @@ class AsyncAPISocketIO(AsyncServer):
             request_model (Optional[Type[BaseModel]], optional): Request payload model used
                 for validation and documentation. Defaults to None.
         """
-        def decorator(handler: MessageHandler):
+        def decorator(handler: MessageHandler):  # -> Callable[..., Coroutine[Any, Any, PAYLOAD_INSTANCES]]:
 
             nonlocal request_model
             nonlocal response_model
+
             if get_from_typehint:
                 try:
                     first_arg_name = inspect.getfullargspec(handler)[0][-1]
@@ -197,12 +202,9 @@ class AsyncAPISocketIO(AsyncServer):
                 posible_response_model = handler.__annotations__.get(
                     "return", "NotProvided")
                 if request_model is None:
-                    request_model = posible_request_model  # type: ignore
+                    request_model = posible_request_model
                 if response_model is None:
-                    response_model = posible_response_model  # type: ignore
-
-            # print(f"request_model: {request_model}")
-            # print(f"response_model: {response_model}")
+                    response_model = posible_response_model
 
             if self.generate_docs:
                 self.asyncapi_doc.add_new_receiver(
@@ -222,7 +224,7 @@ class AsyncAPISocketIO(AsyncServer):
                 return await new_handler(*args, **kwargs)
 
             # Decorate with SocketIO.on decorator
-            super(AsyncAPISocketIO, self).on(message, namespace=namespace)(wrapper)
+            super(AsyncAPISocketIO, self).on(message, namespace=namespace)(wrapper)  # type: ignore
             return wrapper
         return decorator
 
@@ -268,10 +270,8 @@ class AsyncAPISocketIO(AsyncServer):
 
     def _handle_all(self,
                     message: str,
-                    response_model: Optional[Union[Type[BaseModel],
-                                                   NotProvidedType]] = None,
-                    request_model: Optional[Union[Type[BaseModel],
-                                                  NotProvidedType]] = None,
+                    response_model: Optional[Union[PAYLOAD_TYPES, NotProvidedType]] = None,
+                    request_model: Optional[Union[PAYLOAD_TYPES, NotProvidedType]] = None,
                     ):
         """Decorator to validate request and response with pydantic models
         Args:
@@ -289,6 +289,7 @@ class AsyncAPISocketIO(AsyncServer):
             async def wrapper(*args, **kwargs):
                 did_request_came_as_arg = False
                 request = None
+                # new_args: tuple
                 # check if request is in args or kwargs
                 if len(args) > 1:
                     did_request_came_as_arg = True
@@ -302,22 +303,24 @@ class AsyncAPISocketIO(AsyncServer):
                     if request and self.validate and request_model and request_model != NotProvidedType and request_model != 'NotProvided':
                         if issubclass(request_model, BaseModel):
                             try:
-                                request_model.validate(request)  # type: ignore
-                            except ValidationError as e:
-                                logger.error(
-                                    f"ValidationError for incoming request: {e}")
-                                raise RequestValidationError.init_from_super(e)
+                                request_model.validate(request)
+                            except DictError as exc:
+                                error_message = f"ValidationError for incoming request, no dict for BaseModel: {exc}"
+                                logger.error(error_message)
+                                raise RequestValidationError.init_from(error_message, message, request_model, exc)
+                            except ValidationError as exc:
+                                error_message = f"ValidationError for incoming request: {exc}"
+                                logger.error(error_message)
+                                raise RequestValidationError.init_from(error_message, message, request_model, exc)
 
-                            request = request_model.parse_obj(
-                                request)  # type: ignore
+                            request = request_model.parse_obj(request)
                         else:  # not a base model
                             try:
                                 request = request_model(request)
                             except ValueError as exc:
-                                logger.error(
-                                    "ValidationError for incoming request")
-                                raise RequestValidationError(
-                                    errors=[], model=request_model)
+                                error_message = "ValidationError for incoming request"
+                                logger.error(error_message)
+                                raise RequestValidationError.init_from(error_message, message, request_model, exc)
 
                         if did_request_came_as_arg:
                             args = (args[0], request, *args[2:])
@@ -327,14 +330,13 @@ class AsyncAPISocketIO(AsyncServer):
                     # call handler with converted request and validate response
                     response = await handler(*args, **kwargs)
 
-                    if response:
-                        if isinstance(response, response_model) is False:
-                            # TODO: we require the event name in the handler for correct logging and exception handling
-                            # event= message
+                    if response and self.validate and response_model != NotProvidedType and response_model != 'NotProvided':
+                        try:
+                            check_type(response, response_model)
+                        except TypeCheckError as exc:
                             reason = f"Error validating reponse '{message}': data doesn't match the required datatype {response_model.__name__}"
                             logger.error(reason)
-                            raise ResponseValidationError(
-                                message=reason, event_name=message)
+                            raise ResponseValidationError.init_from(reason, message, response_model, exc)
 
                 except Exception as exc:
                     # err_handler = self.exception_handlers.get(
@@ -343,7 +345,7 @@ class AsyncAPISocketIO(AsyncServer):
                     if err_handler is None:
                         return
                     response = await err_handler(exc)
-                # if response is a pydantic model, convert it to json
+                # if response is a pydantic model, convert it to a dict
                 if isinstance(response, BaseModel):
                     return response.dict()
                 else:
