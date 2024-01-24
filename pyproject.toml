@@ -40,7 +40,7 @@ exclude = [".venv", "doc", "dist", "www"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-pythonpath = "."
+pythonpath = "src"
 python_files = ["test_*.py"]
 python_functions = ["test"]
 testpaths = ["tests"]
