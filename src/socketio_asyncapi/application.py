@@ -1,6 +1,9 @@
+"""
+Provide the implementation of a AsyncSocketIO that supports type validation and an AsyncAPI spec.
+"""
 import inspect
 import asyncio
-from typing import Optional, Union, Awaitable, Any, ParamSpec
+from typing import Optional, Union, Awaitable, Any, ParamSpec, Coroutine
 from collections.abc import Callable
 
 from socketio import AsyncServer  # type: ignore[import-untyped]
@@ -9,7 +12,7 @@ from pydantic import BaseModel, ValidationError, DictError
 from typeguard import check_type, TypeCheckError
 from socketio_asyncapi.asyncapi.docs import AsyncAPIDoc
 
-from socketio_asyncapi.asyncapi.types import NotProvidedType, PAYLOAD_INSTANCES, PAYLOAD_TYPES
+from socketio_asyncapi.asyncapi.types import NotProvidedType, PAYLOAD_INSTANCES, PAYLOAD_TYPES, PAYLOAD_BASE
 
 
 # TODO: no strict enough:
@@ -166,17 +169,19 @@ class AsyncAPISocketIO(AsyncServer):
 
     def on(
             self,
-            message: str,
+            event: str,
+            handler: MessageHandler | None = None,
             namespace: str | None = None,
             *,
             get_from_typehint: bool = True,
             response_model: Optional[Union[PAYLOAD_TYPES, NotProvidedType]] = None,
             request_model: Optional[Union[PAYLOAD_TYPES, NotProvidedType]] = None,
-    ):
+    ) -> Callable[..., Callable[..., Coroutine[Any, Any, Any]]] | None:
         """Decorator to register a SocketIO event handler with additional functionalities
 
         Args:
-            message (str): refer to SocketIO.on(message)
+            event (str): refer to SocketIO.on(event)
+            handler (MessageHandler): when provided this function isn't used a decorator, but the provided handler is used
             namespace (str, optional): refer to SocketIO.on(namespace). Defaults to None.
             get_from_typehint (bool, optional): Get request and response models from typehint.
                 request_model and response_model take precedence over typehints if not None.
@@ -192,40 +197,46 @@ class AsyncAPISocketIO(AsyncServer):
             nonlocal response_model
 
             if get_from_typehint:
-                try:
-                    first_arg_name = inspect.getfullargspec(handler)[0][-1]
-                except IndexError:
-                    posible_request_model = None
-                else:
-                    posible_request_model = handler.__annotations__.get(
-                        first_arg_name, "NotProvided")
-                posible_response_model = handler.__annotations__.get(
-                    "return", "NotProvided")
                 if request_model is None:
+                    try:
+                        first_arg_name = inspect.getfullargspec(handler)[0][-1]
+                    except IndexError:
+                        posible_request_model = None
+                    else:
+                        posible_request_model = handler.__annotations__.get(
+                            first_arg_name, "NotProvided")
                     request_model = posible_request_model
+
                 if response_model is None:
-                    response_model = posible_response_model
+                    response_model = handler.__annotations__.get("return", "NotProvided")
 
             if self.generate_docs:
                 self.asyncapi_doc.add_new_receiver(
                     handler,
                     namespace,
-                    message,
+                    event,
                     ack_data_model=response_model,
                     payload_model=request_model,
                 )
 
             async def wrapper(*args, **kwargs):
-                new_handler = self._handle_all(
-                    message,
-                    request_model=request_model,
-                    response_model=response_model
-                )(handler)
-                return await new_handler(*args, **kwargs)
+                response = await self._process_event(
+                    event,
+                    handler,
+                    request_model,
+                    response_model,
+                    *args, **kwargs
+                )
+                return response
 
             # Decorate with SocketIO.on decorator
-            super(AsyncAPISocketIO, self).on(message, namespace=namespace)(wrapper)  # type: ignore
+            super(AsyncAPISocketIO, self).on(event, namespace=namespace, handler=wrapper)
             return wrapper
+
+        # when used as function and not as decorator
+        if handler is not None:
+            decorator(handler)
+            return None
         return decorator
 
     def on_error_default(self, exception_handler: ExceptionHandler) -> ExceptionHandler:
@@ -268,88 +279,91 @@ class AsyncAPISocketIO(AsyncServer):
     #         return exception_handler
     #     return decorator
 
-    def _handle_all(self,
-                    message: str,
-                    response_model: Optional[Union[PAYLOAD_TYPES, NotProvidedType]] = None,
-                    request_model: Optional[Union[PAYLOAD_TYPES, NotProvidedType]] = None,
-                    ):
-        """Decorator to validate request and response with pydantic models
-        Args:
-            handler (Callable, optional): handler function. Defaults to None.
-            response_model (Optional[Type[BaseModel]], optional): Acknowledge model used
-                for validation and documentation. Defaults to None.
-            request_model (Optional[Type[BaseModel]], optional): Request payload model used
-                for validation and documentation. Defaults to None.
+    async def _process_event(self,
+                             event: str,
+                             handler: MessageHandler,
+                             request_model: Optional[Union[PAYLOAD_TYPES, NotProvidedType]],
+                             response_model: Optional[Union[PAYLOAD_TYPES, NotProvidedType]],
+                             *args,
+                             **kwargs
+                             ) -> dict[str, Any] | PAYLOAD_BASE | None:
+        """Validate event data, calls handler and validate response data.
+           When an exception handler is present an invalid type raises an exception.
 
-        Raises: RequestValidationError, ResponseValidationError
+        Args:
+            event (str): event name
+            handler (MessageHandler): handler to calle
+            request_model (Optional[Union[PAYLOAD_TYPES, NotProvidedType]]): Type of event data
+            response_model (Optional[Union[PAYLOAD_TYPES, NotProvidedType]]): Type of event acknowledge data
+
+        Raises:
+            RequestValidationError: Thrown when the incoming event isn't valid
+            ResponseValidationError: : Thrown when response from the handler isn't valid
+
+        Returns:
+            dict[str, Any] | PAYLOAD_BASE | None: When present Acknowledge data returned by socketio
         """
 
-        def decorator(handler: MessageHandler):
+        did_request_came_as_arg = False
+        request = None
+        # new_args: tuple
+        # check if request is in args or kwargs
+        if len(args) > 1:
+            did_request_came_as_arg = True
+            request = args[-1]
+        if not request:
+            did_request_came_as_arg = False
+            request = kwargs.get("request")
 
-            async def wrapper(*args, **kwargs):
-                did_request_came_as_arg = False
-                request = None
-                # new_args: tuple
-                # check if request is in args or kwargs
-                if len(args) > 1:
-                    did_request_came_as_arg = True
-                    request = args[-1]
-                if not request:
-                    did_request_came_as_arg = False
-                    request = kwargs.get("request")
+        # if there is a request in args or kwargs, validate it
+        try:
+            if request and self.validate and request_model and request_model != NotProvidedType and request_model != 'NotProvided':
+                if issubclass(request_model, BaseModel):
+                    try:
+                        request_model.validate(request)
+                    except DictError as exc:
+                        error_message = f"ValidationError for incoming request, no dict for BaseModel: {exc}"
+                        logger.error(error_message)
+                        raise RequestValidationError.init_from(error_message, event, request_model, exc)
+                    except ValidationError as exc:
+                        error_message = f"ValidationError for incoming request: {exc}"
+                        logger.error(error_message)
+                        raise RequestValidationError.init_from(error_message, event, request_model, exc)
 
-                # if there is a request in args or kwargs, validate it
-                try:
-                    if request and self.validate and request_model and request_model != NotProvidedType and request_model != 'NotProvided':
-                        if issubclass(request_model, BaseModel):
-                            try:
-                                request_model.validate(request)
-                            except DictError as exc:
-                                error_message = f"ValidationError for incoming request, no dict for BaseModel: {exc}"
-                                logger.error(error_message)
-                                raise RequestValidationError.init_from(error_message, message, request_model, exc)
-                            except ValidationError as exc:
-                                error_message = f"ValidationError for incoming request: {exc}"
-                                logger.error(error_message)
-                                raise RequestValidationError.init_from(error_message, message, request_model, exc)
+                    request = request_model.parse_obj(request)
+                else:  # not a base model
+                    try:
+                        request = request_model(request)
+                    except ValueError as exc:
+                        error_message = "ValidationError for incoming request"
+                        logger.error(error_message)
+                        raise RequestValidationError.init_from(error_message, event, request_model, exc)
 
-                            request = request_model.parse_obj(request)
-                        else:  # not a base model
-                            try:
-                                request = request_model(request)
-                            except ValueError as exc:
-                                error_message = "ValidationError for incoming request"
-                                logger.error(error_message)
-                                raise RequestValidationError.init_from(error_message, message, request_model, exc)
-
-                        if did_request_came_as_arg:
-                            args = (args[0], request, *args[2:])
-                        else:
-                            kwargs["request"] = request
-
-                    # call handler with converted request and validate response
-                    response = await handler(*args, **kwargs)
-
-                    if response and self.validate and response_model != NotProvidedType and response_model != 'NotProvided':
-                        try:
-                            check_type(response, response_model)
-                        except TypeCheckError as exc:
-                            reason = f"Error validating reponse '{message}': data doesn't match the required datatype {response_model.__name__}"
-                            logger.error(reason)
-                            raise ResponseValidationError.init_from(reason, message, response_model, exc)
-
-                except Exception as exc:
-                    # err_handler = self.exception_handlers.get(
-                    #     namespace, self.default_exception_handler)
-                    err_handler = self.default_exception_handler
-                    if err_handler is None:
-                        return
-                    response = await err_handler(exc)
-                # if response is a pydantic model, convert it to a dict
-                if isinstance(response, BaseModel):
-                    return response.dict()
+                if did_request_came_as_arg:
+                    args = (args[0], request, *args[2:])
                 else:
-                    return response
+                    kwargs["request"] = request
 
-            return wrapper
-        return decorator
+            # call handler with converted request and validate response
+            response = await handler(*args, **kwargs)
+
+            if response and self.validate and response_model != NotProvidedType and response_model != 'NotProvided':
+                try:
+                    check_type(response, response_model)
+                except TypeCheckError as exc:
+                    model_name = response_model.__name__ if response_model is not None else 'None'
+                    reason = f"Error validating reponse '{event}': data doesn't match the required datatype {model_name}"
+                    logger.error(reason)
+                    raise ResponseValidationError.init_from(reason, event, response_model, exc)
+
+        except Exception as exc:
+            # err_handler = self.exception_handlers.get(
+            #     namespace, self.default_exception_handler)
+            err_handler = self.default_exception_handler
+            if err_handler is None:
+                return None
+            response = await err_handler(exc)
+        # if response is a pydantic model, convert it to a dict
+        if isinstance(response, BaseModel):
+            return response.dict()
+        return response
